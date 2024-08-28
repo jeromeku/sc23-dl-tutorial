@@ -1,13 +1,15 @@
-import os
-import logging
 import glob
-import torch
+import logging
+import os
 import random
+
+# import h5py
 import numpy as np
+import torch
+from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
-from torch import Tensor
-import h5py
+
 
 def worker_init(wrk_id):
     np.random.seed(torch.utils.data.get_worker_info().seed%(2**32 - 1))
@@ -50,11 +52,14 @@ class ERA5Dataset(Dataset):
         self.n_in_channels = params.n_in_channels
         self.n_out_channels = params.n_out_channels
         self.normalize = True
-        self.means = np.load(params.global_means_path)[0]
-        self.stds = np.load(params.global_stds_path)[0]
+        # self.means = np.load(params.global_means_path)[0]
+        # self.stds = np.load(params.global_stds_path)[0]
         self.limit_nsamples = params.limit_nsamples if train else params.limit_nsamples_val
-        self._get_files_stats()
-
+     #    self._get_files_stats()
+        self.n_samples_total = 128
+        self.img_shape_x = self.params.img_size[0]
+        self.img_shape_y = self.params.img_size[1]
+    
     def _get_files_stats(self):
         self.files_paths = glob.glob(self.location + "/*.h5")
         self.files_paths.sort()
@@ -90,22 +95,28 @@ class ERA5Dataset(Dataset):
         return torch.as_tensor(img)
 
     def __getitem__(self, global_idx):
-        year_idx = int(global_idx / self.n_samples_per_year)  # which year
-        local_idx = int(global_idx % self.n_samples_per_year) # which sample in that year 
+        # year_idx = int(global_idx / self.n_samples_per_year)  # which year
+        # local_idx = int(global_idx % self.n_samples_per_year) # which sample in that year 
 
-        # open image file
-        if self.files[year_idx] is None:
-            self._open_file(year_idx)
-        step = self.dt # time step
+        # # open image file
+        # if self.files[year_idx] is None:
+        #     self._open_file(year_idx)
+        # step = self.dt # time step
 
-        # boundary conditions to ensure we don't pull data that is not in a specific year
-        local_idx = local_idx % (self.n_samples_per_year - step)
-        if local_idx < step:
-            local_idx += step
+        # # boundary conditions to ensure we don't pull data that is not in a specific year
+        # local_idx = local_idx % (self.n_samples_per_year - step)
+        # if local_idx < step:
+        #     local_idx += step
         
-        # pre-process and get the image fields
-        inp_field = self.files[year_idx][local_idx,:,0:self.img_shape_x,0:self.img_shape_y]
-        tar_field = self.files[year_idx][local_idx+step,:,0:self.img_shape_x,0:self.img_shape_y]
-        inp, tar = self._normalize(inp_field), self._normalize(tar_field)
-
+        # # pre-process and get the image fields
+        # inp_field = self.files[year_idx][local_idx,:,0:self.img_shape_x,0:self.img_shape_y]
+        # tar_field = self.files[year_idx][local_idx+step,:,0:self.img_shape_x,0:self.img_shape_y]
+        # inp, tar = self._normalize(inp_field), self._normalize(tar_field)
+        
+        n_channels = 20
+        h = self.img_shape_x
+        w = self.img_shape_y
+        inp = torch.randn(n_channels, h, w).float()
+        tar = torch.randn(n_channels, h, w).float()
+        
         return inp, tar
